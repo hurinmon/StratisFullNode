@@ -2,20 +2,23 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+
 using LiteDB;
+
 using Microsoft.Extensions.Logging;
+
 using NBitcoin;
+
 using Newtonsoft.Json;
+
 using Stratis.Bitcoin.AsyncWork;
 using Stratis.Bitcoin.Configuration;
 using Stratis.Bitcoin.Features.BlockStore.AddressIndexing;
 using Stratis.Bitcoin.Features.SmartContracts.Models;
 using Stratis.Bitcoin.Features.SmartContracts.Wallet;
 using Stratis.Bitcoin.Utilities;
-using FileMode = LiteDB.FileMode;
 
 namespace Stratis.Features.Unity3dApi
 {
@@ -59,8 +62,8 @@ namespace Stratis.Features.Unity3dApi
         private readonly Network network;
 
         private LiteDatabase db;
-        private LiteCollection<NFTContractModel> NFTContractCollection;
-        private CancellationTokenSource cancellation;
+        private ILiteCollection<NFTContractModel> NFTContractCollection;
+        private readonly CancellationTokenSource cancellation;
         private Task indexingTask;
 
         public NFTTransferIndexer(DataFolder dataFolder, ILoggerFactory loggerFactory, IAsyncProvider asyncProvider,
@@ -73,7 +76,7 @@ namespace Stratis.Features.Unity3dApi
             this.chainIndexer = chainIndexer;
             this.smartContractTransactionService = smartContractTransactionService;
 
-            this.logger = loggerFactory.CreateLogger(this.GetType().FullName);
+            this.logger = loggerFactory.CreateLogger(GetType().FullName);
         }
 
         /// <inheritdoc />
@@ -84,11 +87,10 @@ namespace Stratis.Features.Unity3dApi
 
             string dbPath = Path.Combine(this.dataFolder.RootPath, DatabaseFilename);
 
-            FileMode fileMode = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? FileMode.Exclusive : FileMode.Shared;
-            this.db = new LiteDatabase(new ConnectionString() { Filename = dbPath, Mode = fileMode });
+            this.db = new LiteDatabase(new ConnectionString() { Filename = dbPath });
             this.NFTContractCollection = this.db.GetCollection<NFTContractModel>(DbOwnedNFTsKey);
 
-            this.indexingTask = Task.Run(async () => await this.IndexNFTsContinuouslyAsync().ConfigureAwait(false));
+            this.indexingTask = Task.Run(async () => await IndexNFTsContinuouslyAsync().ConfigureAwait(false));
             this.asyncProvider.RegisterTask($"{nameof(AddressIndexer)}.{nameof(this.indexingTask)}", this.indexingTask);
 
             this.logger.LogDebug("NFTTransferIndexer initialized.");
@@ -114,7 +116,7 @@ namespace Stratis.Features.Unity3dApi
                 return;
             }
 
-            int watchFromHeight = this.GetWatchFromHeight();
+            int watchFromHeight = GetWatchFromHeight();
 
             if (!this.NFTContractCollection.Exists(x => x.ContractAddress == contractAddress))
             {
@@ -183,7 +185,7 @@ namespace Stratis.Features.Unity3dApi
         {
             this.logger.LogTrace("ReindexAllContracts()");
 
-            int watchFromHeight = this.GetWatchFromHeight();
+            int watchFromHeight = GetWatchFromHeight();
 
             foreach (NFTContractModel contractModel in this.NFTContractCollection.FindAll().ToList())
             {
@@ -266,7 +268,7 @@ namespace Stratis.Features.Unity3dApi
                             {
                                 bool fromExists = currentContract.OwnedIDsByAddress.ContainsKey(transferInfo.From);
 
-                                this.logger.LogDebug("FromExists: {0} ",  fromExists);
+                                this.logger.LogDebug("FromExists: {0} ", fromExists);
 
                                 currentContract.OwnedIDsByAddress[transferInfo.From].Remove(transferInfo.TokenId);
 

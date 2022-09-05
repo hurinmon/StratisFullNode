@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
+
 using LiteDB;
+
 using NBitcoin;
+
 using Stratis.Bitcoin.Features.BlockStore.AddressIndexing;
+
 using Xunit;
 
 namespace Stratis.Bitcoin.Features.BlockStore.Tests
@@ -13,14 +16,13 @@ namespace Stratis.Bitcoin.Features.BlockStore.Tests
     {
         private readonly AddressIndexerOutpointsRepository repository;
 
-        private readonly Random random = new Random();
+        private readonly Random random = new();
 
         private readonly int maxItems = 10;
 
         public AddressIndexerOutpointsRepositoryTests()
         {
-            FileMode fileMode = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? FileMode.Exclusive : FileMode.Shared;
-            var db = new LiteDatabase(new ConnectionString() { Filename = this.RandomString(20) + ".litedb", Mode = fileMode });
+            var db = new LiteDatabase(new ConnectionString() { Filename = RandomString(20) + ".litedb" });
 
             this.repository = new AddressIndexerOutpointsRepository(db, this.maxItems);
         }
@@ -29,7 +31,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.Tests
         public void LoadPercentageCalculatedCorrectly()
         {
             for (int i = 0; i < this.maxItems / 2; i++)
-                this.repository.AddOutPointData(new OutPointData() { Outpoint = this.RandomString(20) });
+                this.repository.AddOutPointData(new OutPointData() { Outpoint = RandomString(20) });
 
             Assert.Equal(50, this.repository.GetLoadPercentage());
         }
@@ -44,7 +46,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.Tests
 
             // Add more to trigger eviction.
             for (int i = 0; i < this.maxItems * 2; i++)
-                this.repository.AddOutPointData(new OutPointData() { Outpoint = this.RandomString(20) });
+                this.repository.AddOutPointData(new OutPointData() { Outpoint = RandomString(20) });
 
             Assert.True(this.repository.TryGetOutPointData(outPoint, out OutPointData dataOut));
             Assert.True(data.ScriptPubKeyBytes.SequenceEqual(dataOut.ScriptPubKeyBytes));

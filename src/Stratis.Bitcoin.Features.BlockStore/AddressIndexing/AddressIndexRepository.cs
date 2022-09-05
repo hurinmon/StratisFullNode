@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+
 using LiteDB;
+
 using Microsoft.Extensions.Logging;
+
 using Stratis.Bitcoin.Configuration.Logging;
 using Stratis.Bitcoin.Controllers.Models;
 using Stratis.Bitcoin.Utilities;
@@ -14,7 +17,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
     {
         private const string DbAddressDataKey = "AddrData";
 
-        private readonly LiteCollection<AddressIndexerData> addressIndexerDataCollection;
+        private readonly ILiteCollection<AddressIndexerData> addressIndexerDataCollection;
 
         private readonly ILogger logger;
 
@@ -30,14 +33,14 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
         /// <param name="address">The address to retrieve data for.</param>
         public AddressIndexerData GetOrCreateAddress(string address)
         {
-            if (!this.TryGetValue(address, out AddressIndexerData data))
+            if (!TryGetValue(address, out AddressIndexerData data))
             {
                 this.logger.LogDebug("Not found in cache.");
                 data = this.addressIndexerDataCollection.FindById(address) ?? new AddressIndexerData() { Address = address, BalanceChanges = new List<AddressBalanceChange>() };
             }
 
             int size = 1 + data.BalanceChanges.Count / 10;
-            this.AddOrUpdate(address, data, size);
+            AddOrUpdate(address, data, size);
 
             return data;
         }
@@ -56,7 +59,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
         /// <returns>A list of affected addresses containing balance changes above the specified block height.</returns>
         public List<string> GetAddressesHigherThanHeight(int height)
         {
-            this.SaveAllItems();
+            SaveAllItems();
 
             // Need to specify index name explicitly so that it gets used for the query.
             IEnumerable<AddressIndexerData> affectedAddresses = this.addressIndexerDataCollection.Find(Query.GT("BalanceChangedHeightIndex", height));
@@ -87,7 +90,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
                 List<AddressIndexerData> toUpsert = dirtyItems.Select(x => x.Value).ToList();
 
                 this.addressIndexerDataCollection.Upsert(toUpsert);
-                
+
                 foreach (CacheItem dirtyItem in dirtyItems)
                     dirtyItem.Dirty = false;
 

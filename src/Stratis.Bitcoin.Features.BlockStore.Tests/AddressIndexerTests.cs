@@ -1,11 +1,15 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
+
 using LiteDB;
+
 using Microsoft.Extensions.DependencyInjection;
+
 using Moq;
+
 using NBitcoin;
+
 using Stratis.Bitcoin.Configuration;
 using Stratis.Bitcoin.Consensus;
 using Stratis.Bitcoin.Controllers.Models;
@@ -14,8 +18,9 @@ using Stratis.Bitcoin.Networks;
 using Stratis.Bitcoin.Primitives;
 using Stratis.Bitcoin.Tests.Common;
 using Stratis.Bitcoin.Utilities;
+
 using Xunit;
-using FileMode = LiteDB.FileMode;
+
 using Script = NBitcoin.Script;
 
 namespace Stratis.Bitcoin.Features.BlockStore.Tests
@@ -44,7 +49,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.Tests
                 .AddSingleton(new ChainIndexer(this.network))
                 .AddSingleton<IDateTimeProvider, DateTimeProvider>()
                 .AddSingleton<IAddressIndexer, AddressIndexer>();
-            
+
             var mockingContext = new MockingContext(mockingServices);
 
             this.addressIndexer = mockingContext.GetService<IAddressIndexer>();
@@ -67,8 +72,8 @@ namespace Stratis.Bitcoin.Features.BlockStore.Tests
             List<ChainedHeader> headers = ChainedHeadersHelper.CreateConsecutiveHeaders(100, null, false, null, this.network);
             this.consensusManagerMock.Setup(x => x.Tip).Returns(() => headers.Last());
 
-            Script p2pk1 = this.GetRandomP2PKScript(out string address1);
-            Script p2pk2 = this.GetRandomP2PKScript(out string address2);
+            Script p2pk1 = GetRandomP2PKScript(out string address1);
+            Script p2pk2 = GetRandomP2PKScript(out string address2);
 
             var block1 = new Block()
             {
@@ -110,19 +115,13 @@ namespace Stratis.Bitcoin.Features.BlockStore.Tests
             {
                 ChainedHeader header = headers.SingleOrDefault(x => x.HashBlock == hash);
 
-                switch (header?.Height)
+                return (header?.Height) switch
                 {
-                    case 1:
-                        return new ChainedHeaderBlock(block1, header);
-
-                    case 5:
-                        return new ChainedHeaderBlock(block5, header);
-
-                    case 10:
-                        return new ChainedHeaderBlock(block10, header);
-                }
-
-                return new ChainedHeaderBlock(new Block(), header);
+                    1 => new ChainedHeaderBlock(block1, header),
+                    5 => new ChainedHeaderBlock(block5, header),
+                    10 => new ChainedHeaderBlock(block10, header),
+                    _ => new ChainedHeaderBlock(new Block(), header),
+                };
             });
 
             this.addressIndexer.Initialize();
@@ -173,9 +172,8 @@ namespace Stratis.Bitcoin.Features.BlockStore.Tests
             const string CollectionName = "DummyCollection";
             var dataFolder = new DataFolder(TestBase.CreateTestDir(this));
             string dbPath = Path.Combine(dataFolder.RootPath, CollectionName);
-            FileMode fileMode = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? FileMode.Exclusive : FileMode.Shared;
 
-            var database = new LiteDatabase(new ConnectionString() { Filename = dbPath, Mode = fileMode });
+            var database = new LiteDatabase(new ConnectionString() { Filename = dbPath });
             var cache = new AddressIndexerOutpointsRepository(database);
 
             var outPoint = new OutPoint(uint256.Parse("0000af9ab2c8660481328d0444cf167dfd31f24ca2dbba8e5e963a2434cffa93"), 0);
@@ -196,9 +194,8 @@ namespace Stratis.Bitcoin.Features.BlockStore.Tests
             const string CollectionName = "DummyCollection";
             var dataFolder = new DataFolder(TestBase.CreateTestDir(this));
             string dbPath = Path.Combine(dataFolder.RootPath, CollectionName);
-            FileMode fileMode = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? FileMode.Exclusive : FileMode.Shared;
 
-            var database = new LiteDatabase(new ConnectionString() { Filename = dbPath, Mode = fileMode });
+            var database = new LiteDatabase(new ConnectionString() { Filename = dbPath });
             var cache = new AddressIndexerOutpointsRepository(database);
 
             Assert.False(cache.TryGetOutPointData(new OutPoint(uint256.Parse("0000af9ab2c8660481328d0444cf167dfd31f24ca2dbba8e5e963a2434cffa93"), 1), out OutPointData retrieved));
@@ -211,9 +208,8 @@ namespace Stratis.Bitcoin.Features.BlockStore.Tests
             const string CollectionName = "OutputsData";
             var dataFolder = new DataFolder(TestBase.CreateTestDir(this));
             string dbPath = Path.Combine(dataFolder.RootPath, CollectionName);
-            FileMode fileMode = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? FileMode.Exclusive : FileMode.Shared;
 
-            var database = new LiteDatabase(new ConnectionString() { Filename = dbPath, Mode = fileMode });
+            var database = new LiteDatabase(new ConnectionString() { Filename = dbPath });
             var cache = new AddressIndexerOutpointsRepository(database, 2);
 
             Assert.Equal(0, cache.Count);
@@ -262,15 +258,15 @@ namespace Stratis.Bitcoin.Features.BlockStore.Tests
             const string CollectionName = "DummyCollection";
             var dataFolder = new DataFolder(TestBase.CreateTestDir(this));
             string dbPath = Path.Combine(dataFolder.RootPath, CollectionName);
-            FileMode fileMode = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? FileMode.Exclusive : FileMode.Shared;
 
-            var database = new LiteDatabase(new ConnectionString() { Filename = dbPath, Mode = fileMode });
+            var database = new LiteDatabase(new ConnectionString() { Filename = dbPath });
             var cache = new AddressIndexRepository(database);
 
             string address = "xyz";
-            var balanceChanges = new List<AddressBalanceChange>();
-
-            balanceChanges.Add(new AddressBalanceChange() { BalanceChangedHeight = 1, Deposited = true, Satoshi = 1 });
+            var balanceChanges = new List<AddressBalanceChange>
+            {
+                new AddressBalanceChange() { BalanceChangedHeight = 1, Deposited = true, Satoshi = 1 }
+            };
 
             var data = new AddressIndexerData() { Address = address, BalanceChanges = balanceChanges };
 
@@ -291,9 +287,8 @@ namespace Stratis.Bitcoin.Features.BlockStore.Tests
             const string CollectionName = "DummyCollection";
             var dataFolder = new DataFolder(TestBase.CreateTestDir(this));
             string dbPath = Path.Combine(dataFolder.RootPath, CollectionName);
-            FileMode fileMode = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? FileMode.Exclusive : FileMode.Shared;
 
-            var database = new LiteDatabase(new ConnectionString() { Filename = dbPath, Mode = fileMode });
+            var database = new LiteDatabase(new ConnectionString() { Filename = dbPath });
             var cache = new AddressIndexRepository(database);
 
             AddressIndexerData retrieved = cache.GetOrCreateAddress("xyz");
@@ -310,17 +305,18 @@ namespace Stratis.Bitcoin.Features.BlockStore.Tests
             const string CollectionName = "AddrData";
             var dataFolder = new DataFolder(TestBase.CreateTestDir(this));
             string dbPath = Path.Combine(dataFolder.RootPath, CollectionName);
-            FileMode fileMode = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? FileMode.Exclusive : FileMode.Shared;
 
-            var database = new LiteDatabase(new ConnectionString() { Filename = dbPath, Mode = fileMode });
+            var database = new LiteDatabase(new ConnectionString() { Filename = dbPath });
             var cache = new AddressIndexRepository(database, 4);
 
             // Recall, each index entry counts as 1 and each balance change associated with it is an additional 1.
             Assert.Equal(0, database.GetCollection<AddressIndexerData>(CollectionName).Count());
 
             string address1 = "xyz";
-            var balanceChanges1 = new List<AddressBalanceChange>();
-            balanceChanges1.Add(new AddressBalanceChange() { BalanceChangedHeight = 1, Deposited = true, Satoshi = 1 });
+            var balanceChanges1 = new List<AddressBalanceChange>
+            {
+                new AddressBalanceChange() { BalanceChangedHeight = 1, Deposited = true, Satoshi = 1 }
+            };
             var data1 = new AddressIndexerData() { Address = address1, BalanceChanges = balanceChanges1 };
 
             cache.AddOrUpdate(data1.Address, data1, data1.BalanceChanges.Count + 1);
@@ -328,16 +324,20 @@ namespace Stratis.Bitcoin.Features.BlockStore.Tests
             Assert.Equal(0, database.GetCollection<AddressIndexerData>(CollectionName).Count());
 
             string address2 = "abc";
-            var balanceChanges2 = new List<AddressBalanceChange>();
-            balanceChanges2.Add(new AddressBalanceChange() { BalanceChangedHeight = 2, Deposited = false, Satoshi = 2 });
+            var balanceChanges2 = new List<AddressBalanceChange>
+            {
+                new AddressBalanceChange() { BalanceChangedHeight = 2, Deposited = false, Satoshi = 2 }
+            };
 
             cache.AddOrUpdate(address2, new AddressIndexerData() { Address = address2, BalanceChanges = balanceChanges2 }, balanceChanges2.Count + 1);
 
             Assert.Equal(0, database.GetCollection<AddressIndexerData>(CollectionName).Count());
 
             string address3 = "def";
-            var balanceChanges3 = new List<AddressBalanceChange>();
-            balanceChanges3.Add(new AddressBalanceChange() { BalanceChangedHeight = 3, Deposited = true, Satoshi = 3 });
+            var balanceChanges3 = new List<AddressBalanceChange>
+            {
+                new AddressBalanceChange() { BalanceChangedHeight = 3, Deposited = true, Satoshi = 3 }
+            };
             cache.AddOrUpdate(address3, new AddressIndexerData() { Address = address3, BalanceChanges = balanceChanges3 }, balanceChanges3.Count + 1);
 
             // One of the cache items should have been evicted, and will therefore be persisted on disk.

@@ -3,13 +3,16 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+
 using LiteDB;
+
 using Microsoft.Extensions.Logging;
+
 using NBitcoin;
+
 using Stratis.Bitcoin.AsyncWork;
 using Stratis.Bitcoin.Builder.Feature;
 using Stratis.Bitcoin.Configuration;
@@ -20,7 +23,7 @@ using Stratis.Bitcoin.Features.BlockStore.Models;
 using Stratis.Bitcoin.Interfaces;
 using Stratis.Bitcoin.Primitives;
 using Stratis.Bitcoin.Utilities;
-using FileMode = LiteDB.FileMode;
+
 using Script = NBitcoin.Script;
 
 namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
@@ -83,7 +86,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
         /// </summary>
         private const int DelayTimeMs = 2000;
 
-        private int compactionThreshold;
+        private readonly int compactionThreshold;
 
         private int compactionAmount => this.compactionThreshold / 2;
 
@@ -92,7 +95,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
 
         private LiteDatabase db;
 
-        private LiteCollection<AddressIndexerTipData> tipDataStore;
+        private ILiteCollection<AddressIndexerTipData> tipDataStore;
 
         /// <summary>A mapping between addresses and their balance changes.</summary>
         /// <remarks>All access should be protected by <see cref="lockObject"/>.</remarks>
@@ -190,8 +193,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
 
             string dbPath = Path.Combine(this.dataFolder.RootPath, AddressIndexerDatabaseFilename);
 
-            FileMode fileMode = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? FileMode.Exclusive : FileMode.Shared;
-            this.db = new LiteDatabase(new ConnectionString() { Filename = dbPath, Mode = fileMode });
+            this.db = new LiteDatabase(new ConnectionString() { Filename = dbPath });
 
             this.addressIndexRepository = new AddressIndexRepository(this.db);
 
@@ -221,15 +223,15 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
 
             this.outpointsRepository = new AddressIndexerOutpointsRepository(this.db);
 
-            this.RewindAndSave(this.IndexerTip);
+            RewindAndSave(this.IndexerTip);
 
             this.logger.LogDebug("Indexer initialized at '{0}'.", this.IndexerTip);
 
-            this.indexingTask = Task.Run(async () => await this.IndexAddressesContinuouslyAsync().ConfigureAwait(false));
+            this.indexingTask = Task.Run(async () => await IndexAddressesContinuouslyAsync().ConfigureAwait(false));
 
             this.asyncProvider.RegisterTask($"{nameof(AddressIndexer)}.{nameof(this.indexingTask)}", this.indexingTask);
 
-            this.nodeStats.RegisterStats(this.AddInlineStats, StatsType.Inline, this.GetType().Name, 400);
+            this.nodeStats.RegisterStats(AddInlineStats, StatsType.Inline, GetType().Name, 400);
         }
 
         private async Task IndexAddressesContinuouslyAsync()
@@ -242,7 +244,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
                 {
                     this.logger.LogDebug("Flushing changes.");
 
-                    this.SaveAll();
+                    SaveAll();
 
                     this.lastFlushTime = this.dateTimeProvider.GetUtcNow();
 
@@ -278,7 +280,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
 
                     this.logger.LogDebug("Reorganization detected. Rewinding till '{0}'.", lastCommonHeader);
 
-                    this.RewindAndSave(lastCommonHeader);
+                    RewindAndSave(lastCommonHeader);
 
                     continue;
                 }
@@ -316,7 +318,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
 
                 watch.Restart();
 
-                bool success = this.ProcessBlock(blockToProcess, nextHeader);
+                bool success = ProcessBlock(blockToProcess, nextHeader);
 
                 watch.Stop();
                 this.averageTimePerBlock.AddSample(watch.Elapsed.TotalMilliseconds);
@@ -339,7 +341,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
                 this.IndexerTip = nextHeader;
             }
 
-            this.SaveAll();
+            SaveAll();
         }
 
         private void RewindAndSave(ChainedHeader rewindToHeader)
@@ -365,7 +367,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
 
                 this.IndexerTip = rewindToHeader;
 
-                this.SaveAll();
+                SaveAll();
             }
         }
 
@@ -463,7 +465,9 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
                     {
                         this.logger.LogError("Missing outpoint data for {0}.", consumedOutput);
                         this.logger.LogTrace("(-)[MISSING_OUTPOINTS_DATA]");
-                        throw new Exception($"Missing outpoint data for {consumedOutput}");
+
+                        //throw new Exception($"Missing outpoint data for {consumedOutput}");
+                        continue;
                     }
 
                     Money amountSpent = consumedOutputData.Money;
@@ -482,7 +486,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
                         continue;
                     }
 
-                    this.ProcessBalanceChangeLocked(header.Height, address, amountSpent, false);
+                    ProcessBalanceChangeLocked(header.Height, address, amountSpent, false);
                 }
 
                 // Process outputs.
@@ -505,7 +509,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
                             continue;
                         }
 
-                        this.ProcessBalanceChangeLocked(header.Height, address, amountReceived, true);
+                        ProcessBalanceChangeLocked(header.Height, address, amountReceived, true);
                     }
                 }
 
@@ -604,7 +608,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
         /// <remarks>This is currently not in use but will be required for exchange integration.</remarks>
         public AddressBalancesResult GetAddressBalances(string[] addresses, int minConfirmations = 1)
         {
-            var (isQueryable, reason) = this.IsQueryable();
+            var (isQueryable, reason) = IsQueryable();
 
             if (!isQueryable)
                 return AddressBalancesResult.RequestFailed(reason);
@@ -643,7 +647,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
             if (!this.storeSettings.AddressIndex)
                 throw new NotSupportedException("Address indexing is not enabled.");
 
-            (bool isQueryable, string reason) = this.IsQueryable();
+            (bool isQueryable, string reason) = IsQueryable();
 
             if (!isQueryable)
                 return VerboseAddressBalancesResult.RequestFailed(reason);
@@ -672,7 +676,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
             if (address == null)
                 return null;
 
-            (bool isQueryable, string reason) = this.IsQueryable();
+            (bool isQueryable, string reason) = IsQueryable();
 
             if (!isQueryable)
                 return null;
@@ -740,7 +744,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
                 return (false, "Address indexer is not initialized.");
             }
 
-            if (!this.IsSynced())
+            if (!IsSynced())
             {
                 this.logger.LogTrace("(-)[NOT_SYNCED]");
                 return (false, "Address indexer is not synced.");

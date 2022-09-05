@@ -1,9 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+
 using LiteDB;
+
 using Microsoft.Extensions.Logging;
+
 using NBitcoin;
+
 using Stratis.Bitcoin.Configuration.Logging;
 using Stratis.Bitcoin.Utilities;
 
@@ -18,11 +22,11 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
 
         /// <summary>Represents the output collection.</summary>
         /// <remarks>Should be protected by <see cref="LockObject"/></remarks>
-        private readonly LiteCollection<OutPointData> addressIndexerOutPointData;
+        private readonly ILiteCollection<OutPointData> addressIndexerOutPointData;
 
         /// <summary>Represents the rewind data collection.</summary>
         /// <remarks>Should be protected by <see cref="LockObject"/></remarks>
-        private readonly LiteCollection<AddressIndexerRewindData> addressIndexerRewindData;
+        private readonly ILiteCollection<AddressIndexerRewindData> addressIndexerRewindData;
 
         private readonly ILogger logger;
 
@@ -43,7 +47,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
 
         public void AddOutPointData(OutPointData outPointData)
         {
-            this.AddOrUpdate(new CacheItem(outPointData.Outpoint, outPointData, 1));
+            AddOrUpdate(new CacheItem(outPointData.Outpoint, outPointData, 1));
         }
 
         public void RemoveOutPointData(OutPoint outPoint)
@@ -72,7 +76,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
 
         public bool TryGetOutPointData(OutPoint outPoint, out OutPointData outPointData)
         {
-            if (this.TryGetValue(outPoint.ToString(), out outPointData))
+            if (TryGetValue(outPoint.ToString(), out outPointData))
             {
                 this.logger.LogTrace("(-)[FOUND_IN_CACHE]:true");
                 return true;
@@ -83,7 +87,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
 
             if (outPointData != null)
             {
-                this.AddOutPointData(outPointData);
+                AddOutPointData(outPointData);
                 this.logger.LogTrace("(-)[FOUND_IN_DATABASE]:true");
                 return true;
             }
@@ -104,7 +108,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
 
                 this.logger.LogDebug("{0} items saved.", dirtyItems.Length);
             }
-            
+
         }
 
         /// <summary>Persists rewind data into the repository.</summary>
@@ -124,7 +128,8 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
             lock (this.LockObject)
             {
                 this.logger.LogInformation("AddressIndexer: started purging rewind data items.");
-                int purgedCount = this.addressIndexerRewindData.Delete(x => x.BlockHeight < height);
+
+                int purgedCount = this.addressIndexerRewindData.DeleteMany(x => x.BlockHeight < height);
                 this.logger.LogInformation("AddressIndexer: Purged {0} rewind data items.", purgedCount);
             }
         }
@@ -143,7 +148,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
                 {
                     // Put the spent outputs back into the cache.
                     foreach (OutPointData outPointData in rewindData.SpentOutputs)
-                        this.AddOutPointData(outPointData);
+                        AddOutPointData(outPointData);
 
                     // This rewind data item should now be removed from the collection.
                     this.addressIndexerRewindData.Delete(rewindData.BlockHash);
