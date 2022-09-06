@@ -1,12 +1,16 @@
 ﻿using System;
 using System.Text;
 using System.Threading.Tasks;
+
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+
 using NBitcoin;
+
 using Stratis.Bitcoin.Builder;
 using Stratis.Bitcoin.Builder.Feature;
+using Stratis.Bitcoin.Features.Wallet.Controllers;
 
 namespace Stratis.Bitcoin.Features.Api
 {
@@ -45,7 +49,7 @@ namespace Stratis.Bitcoin.Features.Api
             this.apiFeatureOptions = apiFeatureOptions;
             this.apiSettings = apiSettings;
             this.certificateStore = certificateStore;
-            this.logger = loggerFactory.CreateLogger(this.GetType().FullName);
+            this.logger = loggerFactory.CreateLogger(GetType().FullName);
 
             this.InitializeBeforeBase = true;
         }
@@ -145,6 +149,7 @@ namespace Stratis.Bitcoin.Features.Api
 
                         // Controller
                         services.AddTransient<NodeController>();
+                        services.AddTransient<WalletController>();
                     });
             });
 

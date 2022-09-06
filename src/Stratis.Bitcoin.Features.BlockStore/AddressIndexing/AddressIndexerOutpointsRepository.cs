@@ -61,7 +61,7 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
                     this.totalSize -= 1;
                 }
 
-                if (!node.Value.Dirty)
+                if (node != null && !node.Value.Dirty)
                     this.addressIndexerOutPointData.Delete(outPoint.ToString());
             }
         }
