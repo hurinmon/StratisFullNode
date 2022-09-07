@@ -7,11 +7,15 @@ namespace Stratis.Bitcoin.Controllers.Models.Was
     public class Transaction
     {
         public string Hash { get; set; }
+
         public uint Version { get; set; }
+
         public IEnumerable<TxIn> TxIns { get; set; }
+
         public IEnumerable<TxOut> TxOuts { get; set; }
 
-        internal const uint LOCKTIME_THRESHOLD = 500000000; // Tue Nov  5 00:53:20 1985 UTC
+        internal const uint LOCKTIMETHRESHOLD = 500000000; // Tue Nov  5 00:53:20 1985 UTC
+
         public long LockTime { get; set; }
 
 

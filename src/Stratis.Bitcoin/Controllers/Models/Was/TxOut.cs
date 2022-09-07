@@ -3,6 +3,7 @@
     public class TxOut
     {
         public string ScriptPubKey { get; set; }
+
         public long Satoshis { get; set; }
     }
 
