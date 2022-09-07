@@ -15,6 +15,7 @@ using Stratis.Bitcoin.Configuration;
 using Stratis.Bitcoin.Connection;
 using Stratis.Bitcoin.Consensus;
 using Stratis.Bitcoin.Controllers.Models;
+using Stratis.Bitcoin.Controllers.Models.Was;
 using Stratis.Bitcoin.Features.BlockStore.AddressIndexing;
 using Stratis.Bitcoin.Features.Consensus.CoinViews;
 using Stratis.Bitcoin.Features.Wallet.Interfaces;
@@ -158,24 +159,74 @@ namespace Stratis.Bitcoin.Features.Api
             return Json(response);
         }
 
+        [Route("gettransactions")]
+        [HttpPost]
+        public async Task<ResponseTransactions> GetTransactionsAsync([FromBody] RequestTransactions request)
+        {
+            List<Controllers.Models.Was.Transaction> transactions = new();
+            List<Controllers.Models.Was.Transaction> pools = new();
+
+            foreach (var trxid in request.TxHashs)
+            {
+                try
+                {
+                    uint256 txid;
+                    if (!uint256.TryParse(trxid, out txid))
+                    {
+                        continue;
+                    }
+
+                    // First tries to find a pooledTransaction. If can't, will retrieve it from the blockstore if it exists.
+                    NBitcoin.Transaction trx = this.pooledTransaction != null ? await this.pooledTransaction.GetTransaction(txid).ConfigureAwait(false) : null;
+                    if (trx == null)
+                    {
+                        trx = this.blockStore?.GetTransactionById(txid);
+
+                        if (trx == null)
+                        {
+                            continue;
+                        }
+                        else
+                        {
+                            transactions.Add(trx.ToModel());
+                        }
+                    }
+                    else
+                    {
+                        pools.Add(trx.ToModel());
+                    }
+                }
+                catch (Exception e)
+                {
+                    this.logger.LogError("Exception occurred: {0}", e.ToString());
+                }
+            }
+
+            return new ResponseTransactions
+            {
+                Txs = transactions,
+                Pools = pools,
+            };
+        }
+
         [Route("sendtoadress")]
         [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.BadRequest)]
         public async Task<ResponseSendToAddress> SendToAdressAsync([FromBody] RequestSendToAddress request)
         {
-            Transaction transaction = SendCoin(request.Wif, request.fromAddress, request.ToAddress, request.Amount, false);
+            NBitcoin.Transaction transaction = SendCoin(request.Wif, request.fromAddress, request.ToAddress, request.Amount, false);
             await this.broadcasterManager.BroadcastTransactionAsync(transaction);
             return new ResponseSendToAddress
             {
                 TxHash = transaction.GetHash().ToString(),
             };
         }
-        public Transaction SendCoin(string wif, string fromAddress, string destinationAddress, long amount, bool subtractFeesFromRecipients)
+        public NBitcoin.Transaction SendCoin(string wif, string fromAddress, string destinationAddress, long amount, bool subtractFeesFromRecipients)
         {
             return SendCoin(Key.Parse(wif, this.network), fromAddress, destinationAddress, amount, new Money(this.network.MinTxFee), subtractFeesFromRecipients);
         }
-        public Transaction SendCoin(Key sourcePriveatKey, string fromAddress, string destinationAddress, long amount, Money fee, bool subtractFeesFromRecipients)
+        public NBitcoin.Transaction SendCoin(Key sourcePriveatKey, string fromAddress, string destinationAddress, long amount, Money fee, bool subtractFeesFromRecipients)
         {
             List<Coin> unspendCoins = new();
             {
@@ -188,7 +239,7 @@ namespace Stratis.Bitcoin.Features.Api
                     return null;
                 }
 
-                BitcoinAddress bitcoinAddress = this.network.CreateBitcoinAddress(fromAddress);
+                BitcoinAddress bitcoinAddress = BitcoinAddress.Create(fromAddress);
 
                 AddressIndexerData addressBalances = balancesResult.BalancesData.First();
 
@@ -204,22 +255,22 @@ namespace Stratis.Bitcoin.Features.Api
                 }
 
                 List<Block> blocks = this.blockStore.GetBlocks(blocksToRequest.ToList());
-                List<OutPoint> collectedOutPoints = new List<OutPoint>(deposits.Count);
+                List<NBitcoin.OutPoint> collectedOutPoints = new List<NBitcoin.OutPoint>(deposits.Count);
 
-                foreach (Transaction transaction in blocks.SelectMany(x => x.Transactions))
+                foreach (NBitcoin.Transaction transaction in blocks.SelectMany(x => x.Transactions))
                 {
                     for (int i = 0; i < transaction.Outputs.Count; i++)
                     {
                         if (!transaction.Outputs[i].IsTo(bitcoinAddress))
                             continue;
 
-                        collectedOutPoints.Add(new OutPoint(transaction, i));
+                        collectedOutPoints.Add(new NBitcoin.OutPoint(transaction, i));
                     }
                 }
 
                 FetchCoinsResponse fetchCoinsResponse = this.coinView.FetchCoins(collectedOutPoints.ToArray());
 
-                foreach (KeyValuePair<OutPoint, UnspentOutput> unspentOutput in fetchCoinsResponse.UnspentOutputs)
+                foreach (KeyValuePair<NBitcoin.OutPoint, UnspentOutput> unspentOutput in fetchCoinsResponse.UnspentOutputs)
                 {
                     if (unspentOutput.Value.Coins == null)
                         continue; // spent

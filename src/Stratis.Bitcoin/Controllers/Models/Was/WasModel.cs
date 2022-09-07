@@ -1,6 +1,8 @@
-﻿using Newtonsoft.Json;
+﻿using System.Collections.Generic;
 
-namespace Stratis.Bitcoin.Controllers.Models
+using Newtonsoft.Json;
+
+namespace Stratis.Bitcoin.Controllers.Models.Was
 {
     public class AddressBalance
     {
@@ -31,5 +33,20 @@ namespace Stratis.Bitcoin.Controllers.Models
     {
         [JsonProperty(PropertyName = "txHash")]
         public string TxHash { get; set; }
+    }
+
+    public class RequestTransactions
+    {
+        [JsonProperty(PropertyName = "txHashs")]
+        public IEnumerable<string> TxHashs { get; set; }
+    }
+
+    public class ResponseTransactions
+    {
+        [JsonProperty(PropertyName = "txs")]
+        public IEnumerable<Transaction> Txs { get; set; }
+
+        [JsonProperty(PropertyName = "pools")]
+        public IEnumerable<Transaction> Pools { get; set; }
     }
 }
