@@ -10,7 +10,6 @@ using NBitcoin;
 
 using Stratis.Bitcoin.Builder;
 using Stratis.Bitcoin.Builder.Feature;
-using Stratis.Bitcoin.Features.Wallet.Controllers;
 
 namespace Stratis.Bitcoin.Features.Api
 {
@@ -149,7 +148,7 @@ namespace Stratis.Bitcoin.Features.Api
 
                         // Controller
                         services.AddTransient<NodeController>();
-                        services.AddTransient<WalletController>();
+                        services.AddTransient<BtcController>();
                     });
             });
 

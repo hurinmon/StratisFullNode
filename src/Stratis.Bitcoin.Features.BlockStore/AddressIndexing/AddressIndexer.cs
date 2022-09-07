@@ -219,6 +219,13 @@ namespace Stratis.Bitcoin.Features.BlockStore.AddressIndexing
                     else
                         this.IndexerTip = this.consensusManager.Tip.GetAncestor(this.consensusManager.Tip.Height - rewindAmount);
                 }
+
+
+                //인덱서 시작 위치
+                if (this.storeSettings.AddressIndexerStartHeight > this.IndexerTip.Height)
+                {
+                    this.IndexerTip = this.consensusManager.Tip.GetAncestor(this.storeSettings.AddressIndexerStartHeight);
+                }
             }
 
             this.outpointsRepository = new AddressIndexerOutpointsRepository(this.db);

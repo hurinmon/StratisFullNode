@@ -1,6 +1,9 @@
 ﻿using System.Text;
+
 using Microsoft.Extensions.Logging;
+
 using NBitcoin;
+
 using Stratis.Bitcoin.Configuration;
 using Stratis.Bitcoin.Configuration.Logging;
 using Stratis.Bitcoin.Utilities;
@@ -39,6 +42,8 @@ namespace Stratis.Bitcoin.Features.BlockStore
         /// <summary>How many balance changes per address should be accumulated before compaction happens. Compaction compacts half of the balance changes.</summary>
         public int AddressIndexerCompactionThreshold { get; set; }
 
+        public int AddressIndexerStartHeight { get; set; }
+
         /// <summary>Calculates minimum amount of blocks we need to keep during pruning.</summary>
         private int GetMinPruningAmount()
         {
@@ -67,8 +72,8 @@ namespace Stratis.Bitcoin.Features.BlockStore
             this.AmountOfBlocksToKeep = config.GetOrDefault<int>("prune", 0, this.logger);
             this.PruningEnabled = this.AmountOfBlocksToKeep != 0;
 
-            if (this.PruningEnabled && this.AmountOfBlocksToKeep < this.GetMinPruningAmount())
-                throw new ConfigurationException($"The minimum amount of blocks to keep can't be less than {this.GetMinPruningAmount()}.");
+            if (this.PruningEnabled && this.AmountOfBlocksToKeep < GetMinPruningAmount())
+                throw new ConfigurationException($"The minimum amount of blocks to keep can't be less than {GetMinPruningAmount()}.");
 
             // For now we reuse the same value as ConsensusSetting, when store moves to core this can be updated.
             this.MaxCacheSize = config.GetOrDefault("maxblkstoremem", 5, this.logger);
@@ -78,6 +83,7 @@ namespace Stratis.Bitcoin.Features.BlockStore
             this.ReIndexChain = config.GetOrDefault<bool>("reindex-chain", false, this.logger);
             this.AddressIndex = config.GetOrDefault<bool>("addressindex", false, this.logger);
             this.AddressIndexerCompactionThreshold = config.GetOrDefault<int>("compactionthreshold", 8000, this.logger);
+            this.AddressIndexerStartHeight = config.GetOrDefault<int>("addressindex-startheight", 0, this.logger);
 
             if (this.PruningEnabled && this.TxIndex)
                 throw new ConfigurationException("Prune mode is incompatible with -txindex");
@@ -96,6 +102,7 @@ namespace Stratis.Bitcoin.Features.BlockStore
             builder.AppendLine($"-reindex-chain=<0 or 1>        Rebuild the coindb from block data files on disk.");
             builder.AppendLine($"-addressindex=<0 or 1>         Enable to maintain a full address index.");
             builder.AppendLine($"-compactionthreshold=<integer value>         Specify address indexer compaction threshold.");
+            builder.AppendLine($"-addressindex-startheight=<integer value>         address indexer start height.");
 
             var logger = NodeSettings.Default(network).LoggerFactory.CreateLogger(typeof(StoreSettings).FullName);
             logger.LogInformation(builder.ToString());

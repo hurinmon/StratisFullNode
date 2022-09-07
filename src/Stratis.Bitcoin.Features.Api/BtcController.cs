@@ -30,7 +30,7 @@ namespace Stratis.Bitcoin.Features.Api
     /// </summary>
     [ApiVersion("1")]
     [Route("api/[controller]")]
-    public class Wallet2Controller : Controller
+    public class BtcController : Controller
     {
         /// <summary>Full Node.</summary>
         private readonly IFullNode fullNode;
@@ -88,7 +88,7 @@ namespace Stratis.Bitcoin.Features.Api
 
         private readonly ICoinView coinView;
 
-        public Wallet2Controller(
+        public BtcController(
             ChainIndexer chainIndexer,
             IChainState chainState,
             IConnectionManager connectionManager,
@@ -141,51 +141,54 @@ namespace Stratis.Bitcoin.Features.Api
         [ProducesResponseType((int)HttpStatusCode.BadRequest)]
         public IActionResult GetAddressBalance(string address)
         {
-            long money = -1;
+            AddressBalance response = new()
+            {
+                Satoshi = -1
+            };
             try
             {
                 AddressBalancesResult result = this.addressIndexer.GetAddressBalances(new[] { address }, 1);
-                money = result.Balances.First().Balance.Satoshi;
+                response.Satoshi = result.Balances.First().Balance.Satoshi;
             }
             catch (Exception e)
             {
                 this.logger.LogError("Exception occurred: {0}", e.ToString());
             }
 
-            return Ok(money);
+            return Json(response);
         }
 
         [Route("sendtoadress")]
-        [HttpGet]
+        [HttpPost]
         [ProducesResponseType((int)HttpStatusCode.OK)]
         [ProducesResponseType((int)HttpStatusCode.BadRequest)]
-        public async Task<string> SendToAdressAsync(string wif, string toAddress, decimal amount)
+        public async Task<ResponseSendToAddress> SendToAdressAsync([FromBody] RequestSendToAddress request)
         {
-            Transaction transaction = SendCoin(wif, toAddress, amount, true);
+            Transaction transaction = SendCoin(request.Wif, request.fromAddress, request.ToAddress, request.Amount, false);
             await this.broadcasterManager.BroadcastTransactionAsync(transaction);
-            return transaction.GetHash().ToString();
+            return new ResponseSendToAddress
+            {
+                TxHash = transaction.GetHash().ToString(),
+            };
         }
-
-        public Transaction SendCoin(string wif, string destinationAddress, decimal amount, bool subtractFeesFromRecipients)
+        public Transaction SendCoin(string wif, string fromAddress, string destinationAddress, long amount, bool subtractFeesFromRecipients)
         {
-            return SendCoin(Key.Parse(wif, this.network), destinationAddress, amount, new Money(this.network.MinTxFee), subtractFeesFromRecipients);
+            return SendCoin(Key.Parse(wif, this.network), fromAddress, destinationAddress, amount, new Money(this.network.MinTxFee), subtractFeesFromRecipients);
         }
-        public Transaction SendCoin(Key sourcePriveatKey, string destinationAddress, decimal amount, Money fee, bool subtractFeesFromRecipients)
+        public Transaction SendCoin(Key sourcePriveatKey, string fromAddress, string destinationAddress, long amount, Money fee, bool subtractFeesFromRecipients)
         {
             List<Coin> unspendCoins = new();
             {
-                var address = "2N2mYpiv6tPXGCtxcLqCUgUDK4nbyz8kfJf";
-                destinationAddress = "tb1qjm3sqtmg0xz433zt2p8u2qw0uhjr7v0tpcn3k2";
 
-                VerboseAddressBalancesResult balancesResult = this.addressIndexer.GetAddressIndexerState(new[] { address });
+                VerboseAddressBalancesResult balancesResult = this.addressIndexer.GetAddressIndexerState(new[] { fromAddress });
 
                 if (balancesResult.BalancesData == null || balancesResult.BalancesData.Count != 1)
                 {
-                    this.logger.LogWarning("No balances found for address {0}, Reason: {1}", address, balancesResult.Reason);
+                    this.logger.LogWarning("No balances found for address {0}, Reason: {1}", fromAddress, balancesResult.Reason);
                     return null;
                 }
 
-                BitcoinAddress bitcoinAddress = this.network.CreateBitcoinAddress(address);
+                BitcoinAddress bitcoinAddress = this.network.CreateBitcoinAddress(fromAddress);
 
                 AddressIndexerData addressBalances = balancesResult.BalancesData.First();
 
