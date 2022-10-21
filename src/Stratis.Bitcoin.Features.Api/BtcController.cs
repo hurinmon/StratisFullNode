@@ -228,6 +228,8 @@ namespace Stratis.Bitcoin.Features.Api
         }
         public NBitcoin.Transaction SendCoin(Key sourcePriveatKey, string fromAddress, string destinationAddress, long amount, Money fee, bool subtractFeesFromRecipients)
         {
+            BitcoinAddress bitcoinAddress = BitcoinAddress.Create(fromAddress);
+
             List<Coin> unspendCoins = new();
             {
 
@@ -238,8 +240,6 @@ namespace Stratis.Bitcoin.Features.Api
                     this.logger.LogWarning("No balances found for address {0}, Reason: {1}", fromAddress, balancesResult.Reason);
                     return null;
                 }
-
-                BitcoinAddress bitcoinAddress = BitcoinAddress.Create(fromAddress);
 
                 AddressIndexerData addressBalances = balancesResult.BalancesData.First();
 
@@ -289,7 +289,7 @@ namespace Stratis.Bitcoin.Features.Api
                     .AddCoins(coins)
                     .AddKeys(sourcePriveatKey)
                     .Send(destination, new Money(amount, MoneyUnit.Satoshi))
-                    .SetChange(sourcePriveatKey)
+                    .SetChange(bitcoinAddress)
                     .SendFees(fee);
 
                 if (subtractFeesFromRecipients)

@@ -2,7 +2,7 @@
   "profiles": {
     "Stratis.BitcoinD": {
       "commandName": "Project",
-      "commandLineArgs": "-testnet -addressindex"
+      "commandLineArgs": "-testnet -addressindex -txindex"
     },
     "Stratis.BitcoinD Test": {
       "commandName": "Project",
