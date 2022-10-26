@@ -4,6 +4,20 @@ using Newtonsoft.Json;
 
 namespace Stratis.Bitcoin.Controllers.Models.Was
 {
+
+    public class ResponseError
+    {
+        [JsonProperty(PropertyName = "errorCode")]
+        public int ErrorCode { get; set; }
+        [JsonProperty(PropertyName = "description")]
+        public string Description { get; set; }
+    }
+    public class Response
+    {
+        [JsonProperty(PropertyName = "error")]
+        public ResponseError Error { get; set; }
+    }
+
     public class AddressBalance
     {
         [JsonProperty(PropertyName = "satoshi")]
@@ -29,7 +43,7 @@ namespace Stratis.Bitcoin.Controllers.Models.Was
         public bool SubtractFeesFromRecipients { get; set; }
     }
 
-    public class ResponseSendToAddress
+    public class ResponseSendToAddress : Response
     {
         [JsonProperty(PropertyName = "txHash")]
         public string TxHash { get; set; }

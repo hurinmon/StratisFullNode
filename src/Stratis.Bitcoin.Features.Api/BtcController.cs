@@ -215,12 +215,26 @@ namespace Stratis.Bitcoin.Features.Api
         [ProducesResponseType((int)HttpStatusCode.BadRequest)]
         public async Task<ResponseSendToAddress> SendToAdressAsync([FromBody] RequestSendToAddress request)
         {
-            NBitcoin.Transaction transaction = SendCoin(request.Wif, request.fromAddress, request.ToAddress, request.Amount, false);
-            await this.broadcasterManager.BroadcastTransactionAsync(transaction);
-            return new ResponseSendToAddress
+            try
             {
-                TxHash = transaction.GetHash().ToString(),
-            };
+                NBitcoin.Transaction transaction = SendCoin(request.Wif, request.fromAddress, request.ToAddress, request.Amount, false);
+                await this.broadcasterManager.BroadcastTransactionAsync(transaction);
+                return new ResponseSendToAddress
+                {
+                    TxHash = transaction.GetHash().ToString(),
+                };
+            }
+            catch (Exception e)
+            {
+                return new ResponseSendToAddress
+                {
+                    Error = new ResponseError
+                    {
+                        ErrorCode = -1,
+                        Description = e.Message,
+                    }
+                };
+            }
         }
         public NBitcoin.Transaction SendCoin(string wif, string fromAddress, string destinationAddress, long amount, bool subtractFeesFromRecipients)
         {
